@@ -1,0 +1,132 @@
+/*
+* Authors: Brady Inglis, Nick Coffin
+* Brady Inglis Student ID: 100926284
+* Nick Coffin Student ID: 100555045
+* Date of Completion: Feb 23, 2025
+*/
+// Imports
+import { Algorithms } from "./algorithms.js";
+export class EventsPageSetup {
+    /**
+     * Pulls events from local storage and displays them on screen.
+     */
+    static async displayEvents() {
+        const eventsContainer = document.getElementById("eventsContainer");
+        const dateFilter = document.getElementById("dateFilter");
+        const locationFilter = document.getElementById("locationFilter");
+        const categoryFilter = document.getElementById("categoryFilter");
+        if (!eventsContainer) {
+            console.warn("Events container not found");
+            return;
+        }
+        try {
+            // Fetch live events from backend
+            const response = await fetch("/site-data/events.json");
+            if (!response.ok)
+                throw new Error("Could not fetch events.");
+            const eventsJSON = await response.json();
+            const events = eventsJSON.events;
+            // Optionally store in sessionStorage if you want to keep using it elsewhere
+            sessionStorage.setItem("events", JSON.stringify({ events }));
+            // Render events
+            eventsContainer.innerHTML = '';
+            for (const event of events) {
+                eventsContainer.innerHTML +=
+                    `<div class="col event-card" data-category='{"date":"${event.date.split(" ")[0]}","location":"${event.city}","category":"${event.category}"}'>
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">${event.title}</h5>
+                            <p class="card-text mb-1"><strong>Date:</strong> ${event.date}</p>
+                            <p class="card-text mb-1"><strong>Time:</strong> ${event.time}</p>
+                            <p class="card-text mb-1"><strong>Location:</strong> ${event.locationDisplay}</p>
+                            <p class="card-text mb-1"><strong>Category:</strong> ${event.category}</p>
+                            <p class="card-text mb-1"><strong>Description:</strong><br> ${event.description}</p>
+                        </div>
+                    </div>
+                </div>`;
+            }
+            // Rebind filters
+            dateFilter.addEventListener("change", EventsPageSetup.filterEvents);
+            locationFilter.addEventListener("change", EventsPageSetup.filterEvents);
+            categoryFilter.addEventListener("change", EventsPageSetup.filterEvents);
+        }
+        catch (error) {
+            console.error("Failed to load events:", error);
+        }
+    }
+    /**
+     * Hides or shows cards based on selected category
+     */
+    static filterEvents() {
+        const selectedMonth = document.getElementById("dateFilter").value;
+        const selectedLocation = document.getElementById("locationFilter").value;
+        const selectedCategory = document.getElementById("categoryFilter").value;
+        const eventCards = document.querySelectorAll(".event-card");
+        // Show or hide cards based on selected category
+        eventCards.forEach((card) => {
+            const htmlCard = card;
+            const dataCategory = card.getAttribute("data-category");
+            if (!dataCategory)
+                return;
+            const cardFilters = JSON.parse(dataCategory);
+            if ((selectedMonth === "All" || cardFilters["date"] === selectedMonth) &&
+                (selectedLocation === "All" || cardFilters["location"] === selectedLocation) &&
+                (selectedCategory === "All" || cardFilters["category"] === selectedCategory)) {
+                htmlCard.style.display = "block";
+            }
+            else {
+                htmlCard.style.display = "none";
+            }
+        });
+    }
+    /**
+     * Sorts events based on search input.
+     */
+    static sortEvents() {
+        // Ensure events exist in sessionStorage
+        let eventsJSON = null;
+        try {
+            const storedData = sessionStorage.getItem("events");
+            if (!storedData) {
+                console.warn("Events not found in memory.");
+                return { events: [] };
+            }
+            eventsJSON = JSON.parse(storedData);
+        }
+        catch (error) {
+            console.error("Error parsing events from memory: ", error);
+            return { events: [] };
+        }
+        // Ensure eventsJSON contains valid data
+        if (!eventsJSON || !eventsJSON.events) {
+            console.warn("Events data is missing or corrupted.");
+            return { events: [] };
+        }
+        // Get search query
+        const searchInput = document.getElementById("globalSearchInput");
+        if (!searchInput) {
+            console.error("Search input field not found.");
+            return eventsJSON;
+        }
+        const query = searchInput.value.trim();
+        if (query === "")
+            return eventsJSON;
+        // Convert events into an array of titles
+        const stringArray = eventsJSON.events.map(event => event.title);
+        // Get sorted string array
+        const sortedArray = Algorithms.bubbleSortString(stringArray, query);
+        // Sort by name based on sortedArray
+        const sortedEvents = { events: [] };
+        for (const title of sortedArray) {
+            const matchedEvent = eventsJSON.events.find(event => event.title === title);
+            if (matchedEvent) {
+                sortedEvents.events.push(matchedEvent);
+            }
+        }
+        // Store sorted events back in sessionStorage
+        sessionStorage.setItem("events", JSON.stringify(sortedEvents));
+        EventsPageSetup.displayEvents();
+        return sortedEvents;
+    }
+}
+//# sourceMappingURL=eventsPageSetup.js.map
